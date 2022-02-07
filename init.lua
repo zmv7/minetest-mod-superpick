@@ -1,6 +1,5 @@
 local digtime = 0.1
 local caps = {times = {digtime, digtime, digtime}, uses = 0, maxlevel = 256}
-local pickrad
 local function destroy(drops, npos, cid, c_air, c_fire,
 		on_blast_queue, on_construct_queue,
 		ignore_protection, ignore_on_blast, owner)
@@ -58,15 +57,13 @@ minetest.register_tool("superpick:pick", {
 	minetest.chat_send_player(name, "Dont drop!") end,
 
 	on_secondary_use = function(itemstack, user)
-if not pickrad or pickrad >10 then pickrad = 3 end
+local meta = itemstack:get_meta()
 minetest.show_formspec(user:get_player_name(), "superpick:setrad",
 	"size[3,1.5]"..
-	"field[0.3,0.5;3,1;rad;SuperPick Radius:;"..pickrad.."]"..
+	"field[0.3,0.5;3,1;rad;SuperPick Radius:;"..meta:get_int('pickradius').."]"..
 	"button_exit[0.5,1;2,1;submit;Submit]")
-minetest.register_on_player_receive_fields(function(player, formname, fields)
-if fields.rad then
-pickrad = tonumber(fields.rad)
-end end) end,
+end,
+
 	on_place = function(itemstack, user, pointed_thing)
 			if not minetest.check_player_privs(
 				user:get_player_name(), {superpick = true}) then
@@ -77,24 +74,15 @@ end end) end,
 
 		local pos = minetest.get_pointed_thing_position(pointed_thing)
 		if pointed_thing.type == "node" and pos ~= nil then
-
+local meta = itemstack:get_meta()
 local ctrl = user:get_player_control()
 if ctrl.sneak then
-if not pickrad or pickrad >10 then pickrad = 3 end
 minetest.show_formspec(user:get_player_name(), "superpick:setrad",
 	"size[3,1.5]"..
-	"field[0.3,0.5;3,1;rad;SuperPick Radius:;"..pickrad.."]"..
+	"field[0.3,0.5;3,1;rad;SuperPick Radius:;"..meta:get_int('pickradius').."]"..
 	"button_exit[0.5,1;2,1;submit;Submit]")
-minetest.register_on_player_receive_fields(function(player, formname, fields)
-if fields.rad then
-pickrad = tonumber(fields.rad)
-end end)
 else
-
-if not pickrad or pickrad >10 then pickrad = 3 end
-local meta = itemstack:get_meta()
-meta:set_string("pickradius", pickrad)
-local radius = meta:get_string("pickradius")
+local radius = meta:get_int("pickradius")
 			for z = -radius, radius do
 			for y = -radius, radius do
 			for x = -radius, radius do
@@ -102,6 +90,24 @@ local radius = meta:get_string("pickradius")
 			end end end
 		end end
 end})
+
+minetest.register_on_player_receive_fields(function(player, formname, fields)
+if formname == "superpick:setrad" then
+local playername = player:get_player_name()
+local witem = player:get_wielded_item()
+		if witem:get_name() == "superpick:pick" then
+			if fields.rad then
+				local rad = tonumber(fields.rad)
+				if not rad or rad < 0 or rad > 10 then
+					minetest.chat_send_player(playername, "Invalid value or out of bounds")
+					return
+				end
+				local meta = witem:get_meta()
+				minetest.chat_send_player(playername, "SuperPick Radius set to "..minetest.colorize("#FF0",rad))
+				meta:set_int("pickradius", rad)
+				player:set_wielded_item(witem)
+			end
+end end end)
 
 minetest.register_alias("superpick", "superpick:pick")
 minetest.register_privilege("superpick", {description = "Ability to wield the mighty admin pickaxe!",give_to_singleplayer = false})
