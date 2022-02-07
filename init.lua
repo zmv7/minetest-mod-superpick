@@ -1,5 +1,38 @@
 local digtime = 0.1
 local caps = {times = {digtime, digtime, digtime}, uses = 0, maxlevel = 256}
+local pickrad
+local function destroy(drops, npos, cid, c_air, c_fire,
+		on_blast_queue, on_construct_queue,
+		ignore_protection, ignore_on_blast, owner)
+	if not ignore_protection and minetest.is_protected(npos, owner) then
+		return cid
+	end
+
+	local def = cid_data[cid]
+
+	if not def then
+		return c_air
+	elseif not ignore_on_blast and def.on_blast then
+		on_blast_queue[#on_blast_queue + 1] = {
+			pos = vector.new(npos),
+			on_blast = def.on_blast
+		}
+		return cid
+	elseif def.flammable then
+		on_construct_queue[#on_construct_queue + 1] = {
+			fn = basic_flame_on_construct,
+			pos = vector.new(npos)
+		}
+		return c_fire
+	else
+		local node_drops = minetest.get_node_drops(def.name, "")
+		for _, item in pairs(node_drops) do
+			add_drop(drops, item)
+		end
+		return c_air
+	end
+end
+
 minetest.register_tool("superpick:pick", {
 	description = "Super Pickaxe",
 	inventory_image = "superpick.png",
@@ -22,9 +55,54 @@ minetest.register_tool("superpick:pick", {
 	},
 	on_drop = function(itemstack, player)
 	local name = player:get_player_name()
-	minetest.chat_send_player(name, "Dont drop!")
-end
-})
+	minetest.chat_send_player(name, "Dont drop!") end,
+
+	on_secondary_use = function(itemstack, user)
+if not pickrad or pickrad >10 then pickrad = 3 end
+minetest.show_formspec(user:get_player_name(), "superpick:setrad",
+	"size[3,1.5]"..
+	"field[0.3,0.5;3,1;rad;SuperPick Radius:;"..pickrad.."]"..
+	"button_exit[0.5,1;2,1;submit;Submit]")
+minetest.register_on_player_receive_fields(function(player, formname, fields)
+if fields.rad then
+pickrad = tonumber(fields.rad)
+end end) end,
+	on_place = function(itemstack, user, pointed_thing)
+			if not minetest.check_player_privs(
+				user:get_player_name(), {superpick = true}) then
+			minetest.log("action", user:get_player_name() ..
+			" tried to use a Super Pickaxe!")
+			return
+			end
+
+		local pos = minetest.get_pointed_thing_position(pointed_thing)
+		if pointed_thing.type == "node" and pos ~= nil then
+
+local ctrl = user:get_player_control()
+if ctrl.sneak then
+if not pickrad or pickrad >10 then pickrad = 3 end
+minetest.show_formspec(user:get_player_name(), "superpick:setrad",
+	"size[3,1.5]"..
+	"field[0.3,0.5;3,1;rad;SuperPick Radius:;"..pickrad.."]"..
+	"button_exit[0.5,1;2,1;submit;Submit]")
+minetest.register_on_player_receive_fields(function(player, formname, fields)
+if fields.rad then
+pickrad = tonumber(fields.rad)
+end end)
+else
+
+if not pickrad or pickrad >10 then pickrad = 3 end
+local meta = itemstack:get_meta()
+meta:set_string("pickradius", pickrad)
+local radius = meta:get_string("pickradius")
+			for z = -radius, radius do
+			for y = -radius, radius do
+			for x = -radius, radius do
+			minetest.remove_node({x = pos.x + x, y = pos.y + y, z = pos.z + z})
+			end end end
+		end end
+end})
+
 minetest.register_alias("superpick", "superpick:pick")
 minetest.register_privilege("superpick", {description = "Ability to wield the mighty admin pickaxe!",give_to_singleplayer = false})
 
