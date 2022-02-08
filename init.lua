@@ -65,11 +65,8 @@ minetest.show_formspec(user:get_player_name(), "superpick:setrad",
 end,
 
 	on_place = function(itemstack, user, pointed_thing)
-			if not minetest.check_player_privs(
-				user:get_player_name(), {superpick = true}) then
-			minetest.log("action", user:get_player_name() ..
-			" tried to use a Super Pickaxe!")
-			return
+			if not minetest.check_player_privs(user, "superpick") then
+			return {name = ""}
 			end
 
 		local pos = minetest.get_pointed_thing_position(pointed_thing)
